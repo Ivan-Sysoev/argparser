@@ -1,50 +1,88 @@
 #pragma once
-#include <iostream>
-
-static const size_t kMaxArgLen = 128;
+#include <cstddef>
+#include <cstdbool>
 
 namespace nargparse {
-    
-struct ArgumentParser {
-    const char* program_name;   // Имя программы
-    size_t max_arg_len;         // Максимальная длина строковых аргументов
 
-    // ===== Вложенная структура для описания одного аргумента =====
-    struct ArgItem {
-        const char* long_name;     // --option
-        const char* short_name;    // -o
-        const char* description;   // Описание для help
-
-        void* storage;             // Указатель на переменную, куда записывать значение
-        void* default_value;       // Значение по умолчанию (если есть)
-        bool (*validator)(const void*);  // Проверка значения (по типу)
-
-        int nargs;                 // Кол-во значений (kNargsRequired и т.д.)
-        bool is_required;          // Обязательный аргумент?
-        bool is_flag;              // Флаг (bool) или аргумент?
-        int type;                  // 0=int, 1=float, 2=string, 3=flag
-
-        // ===== Повторяющиеся значения =====
-        void** repeated_values;    // Динамический массив указателей на значения
-        int repeated_count;        // Текущее количество значений
-        int repeated_capacity;     // Размер выделенного массива
-    };
-
-    // ===== Массивы для аргументов =====
-    ArgItem* args;                // Динамический массив аргументов
-    int arg_count;                // Количество добавленных аргументов
-    int arg_capacity;             // Размер выделенного массива под аргументы
-
-    // ===== Служебные поля =====
-    bool help_added;              // Был ли добавлен --help
-    bool help_requested;          // Пользователь вызвал --help
+// -------------------------
+//   Количество значений аргумента
+// -------------------------
+enum class ArgNargs {
+    kRequired     = 1,   // Один обязательный аргумент
+    kOptional     = 0,   // Один необязательный аргумент
+    kZeroOrMore   = -1,  // 0 или больше аргументов
+    kOneOrMore    = -2   // 1 или больше аргументов
 };
 
-ArgumentParser& CreateParser(const char* program_name, size_t max_arg_len);
+// -------------------------
+//   Тип аргумента
+// -------------------------
+enum class ArgType {
+    kInt,
+    kFloat,
+    kString,
+    kFlag
+};
 
+// -------------------------
+//   Основная структура парсера
+// -------------------------
+struct ArgumentParser {
+    const char* program_name;
+    size_t max_arg_len;
+
+    struct ArgItem {
+        const char* long_name;
+        const char* short_name;
+        const char* description;
+
+        void* storage;
+        void* default_value;
+        bool (*validator)(const void*);
+        ArgNargs nargs;
+        bool is_required;
+        ArgType type;
+
+        void** repeated_values;
+        int repeated_count;
+        int repeated_capacity;
+    };
+
+    ArgItem* args;
+    int arg_count;
+    int arg_capacity;
+
+    bool help_added;
+    bool help_requested;
+};
+
+// -------------------------
+//   Интерфейс
+// -------------------------
+ArgumentParser CreateParser(const char* program_name, size_t max_arg_len);
 void FreeParser(ArgumentParser& parser);
-bool AddArgument(ArgumentParser& parser);
-void AddFlag(ArgumentParser& parser, const char* short_name = nullptr, const char* long_name, bool& reference, const char* description, bool default_value=false);
+
+bool AddFlag(ArgumentParser& parser, const char* short_name, const char* long_name, bool* storage, const char* description, bool default_value=false);
+
+
+// nargparse::AddArgument(parser, &first_number, "Numbers", nargparse::kNargsZeroOrMore);
+bool AddArgument(ArgumentParser& parser,
+                 int* storage,
+                 const char* short_name = nullptr,
+                 const char* long_name = nullptr,
+                 ArgNargs nargs = ArgNargs::kRequired,
+                 bool required = false,
+                 const int* default_value = nullptr,
+                 bool (*validator)(const int&) = nullptr,
+                 const char* description = nullptr);
+
 bool Parse(ArgumentParser& parser, int argc, const char* argv[]);
 
+int GetRepeatedCount(const ArgumentParser& parser, const char* long_name);
+const int* GetRepeated(const ArgumentParser& parser, const char* long_name, int index);
+
+bool AddHelp(ArgumentParser& parser,
+             const char* long_name = "--help",
+             const char* short_name = "-h",
+             const char* description = "Default help");
 }
