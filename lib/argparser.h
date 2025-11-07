@@ -46,6 +46,8 @@ struct ArgumentParser {
         void** repeated_values;
         int repeated_count;
         int repeated_capacity;
+
+        const char* error_msg;
     };
 
     ArgItem* args;
@@ -62,19 +64,67 @@ struct ArgumentParser {
 ArgumentParser CreateParser(const char* program_name, size_t max_arg_len);
 void FreeParser(ArgumentParser& parser);
 
-bool AddFlag(ArgumentParser& parser, const char* short_name, const char* long_name, bool* storage, const char* description, bool default_value=false);
+bool AddFlag(ArgumentParser& parser,
+             const char* short_name,
+             const char* long_name,
+             bool* storage,
+             const char* description,
+             bool default_value=false);
 
-
-// nargparse::AddArgument(parser, &first_number, "Numbers", nargparse::kNargsZeroOrMore);
+// -------------------------
+//   Positional argument
+// -------------------------
 bool AddArgument(ArgumentParser& parser,
                  int* storage,
-                 const char* short_name = nullptr,
-                 const char* long_name = nullptr,
+                 const char* description,
                  ArgNargs nargs = ArgNargs::kRequired,
-                 bool required = false,
-                 const int* default_value = nullptr,
                  bool (*validator)(const int&) = nullptr,
-                 const char* description = nullptr);
+                 const char* error_msg = nullptr);
+
+bool AddArgument(ArgumentParser& parser,
+                 float* storage,
+                 const char* description,
+                 ArgNargs nargs = ArgNargs::kRequired,
+                 bool (*validator)(const float&) = nullptr,
+                 const char* error_msg = nullptr);
+
+bool AddArgument(ArgumentParser& parser,
+                 char* storage,
+                 const char* description,
+                 ArgNargs nargs = ArgNargs::kRequired,
+                 bool (*validator)(const char*) = nullptr,
+                 const char* error_msg = nullptr);
+
+// -------------------------
+//   Named argument
+// -------------------------
+bool AddArgument(ArgumentParser& parser,
+                 const char* short_name,
+                 const char* long_name,
+                 int* storage,
+                 const char* description,
+                 ArgNargs nargs = ArgNargs::kRequired,
+                 bool (*validator)(const int&) = nullptr,
+                 const char* error_msg = nullptr);
+
+bool AddArgument(ArgumentParser& parser,
+                 const char* short_name,
+                 const char* long_name,
+                 float* storage,
+                 const char* description,
+                 ArgNargs nargs = ArgNargs::kRequired,
+                 bool (*validator)(const float&) = nullptr,
+                 const char* error_msg = nullptr);
+
+bool AddArgument(ArgumentParser& parser,
+                 const char* short_name,
+                 const char* long_name,
+                 char* storage,
+                 const char* description,
+                 ArgNargs nargs = ArgNargs::kRequired,
+                 bool (*validator)(const char*) = nullptr,
+                 const char* error_msg = nullptr);
+
 
 bool Parse(ArgumentParser& parser, int argc, const char* argv[]);
 

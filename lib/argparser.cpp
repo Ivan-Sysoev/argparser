@@ -40,7 +40,7 @@ static void ExpandRepeated(ArgumentParser::ArgItem& arg) {
 
 static ArgumentParser::ArgItem* FindArg(ArgumentParser& parser, const char* name) {
     for (int i = 0; i < parser.arg_count; i++) {
-        auto& a = parser.args[i];
+        ArgumentParser::ArgItem& a = parser.args[i];
         if ((a.long_name && strcmp(a.long_name, name) == 0) ||
             (a.short_name && strcmp(a.short_name, name) == 0))
             return &a;
@@ -87,7 +87,12 @@ void FreeParser(ArgumentParser& parser) {
 // =============================
 //  Добавление аргументов
 // =============================
-bool AddFlag(ArgumentParser& parser, const char* short_name, const char* long_name, bool* storage, const char* description, bool default_value = false) {
+bool AddFlag(ArgumentParser& parser,
+             const char* short_name,
+             const char* long_name,
+             bool* storage,
+             const char* description,
+             bool default_value=false) {
     ExpandArgs(parser);
 
     *storage = default_value;
@@ -106,30 +111,28 @@ bool AddFlag(ArgumentParser& parser, const char* short_name, const char* long_na
     return true;
 }
 
-// nargparse::AddArgument(parser, &first_value, "Positive numbers", nargparse::kNargsZeroOrMore, IsPositive, "must be positive");
-// nargparse::AddArgument(parser, "-n", "--count", &count, "Count value");
-bool AddArgument(ArgumentParser& parser,
-                 int* storage,
-                 const char* short_name = nullptr,
-                 const char* long_name = nullptr,
-                 ArgNargs nargs = ArgNargs::kRequired,
-                 bool required = false,
-                 const int* default_value = nullptr,
-                 bool (*validator)(const int&) = nullptr,
-                 const char* description = nullptr) {
+static bool AddArgument(ArgumentParser& parser,
+                           const char* short_name,
+                           const char* long_name,
+                           void* storage,
+                           ArgType type,
+                           const char* description,
+                           ArgNargs nargs,
+                           bool (*validator)(const void*),
+                           const char* error_msg) {
     ExpandArgs(parser);
     ArgumentParser::ArgItem& arg = parser.args[parser.arg_count++];
-    memset(&arg, 0, sizeof(arg));
+    std::memset(&arg, 0, sizeof(arg));
 
-    arg.long_name = long_name;
     arg.short_name = short_name;
+    arg.long_name = long_name;
     arg.description = description;
     arg.storage = storage;
-    arg.default_value = (void*)default_value;
+    arg.type = type;
     arg.nargs = nargs;
-    arg.is_required = required;
-    arg.type = ArgType::kInt;
-    arg.validator = (bool (*)(const void*))validator;
+    arg.is_required = (nargs == ArgNargs::kRequired);
+    arg.validator = validator;
+    arg.error_msg = error_msg;
 
     return true;
 }
@@ -139,7 +142,7 @@ bool AddArgument(ArgumentParser& parser,
 // =============================
 int GetRepeatedCount(const ArgumentParser& parser, const char* long_name) {
     for (int i = 0; i < parser.arg_count; i++) {
-        const auto& a = parser.args[i];
+        const ArgumentParser::ArgItem& a = parser.args[i];
         if (a.long_name && strcmp(a.long_name, long_name) == 0)
             return a.repeated_count;
     }
@@ -148,8 +151,9 @@ int GetRepeatedCount(const ArgumentParser& parser, const char* long_name) {
 
 const int* GetRepeated(const ArgumentParser& parser, const char* long_name, int index) {
     for (int i = 0; i < parser.arg_count; i++) {
-        const auto& a = parser.args[i];
-        if (a.long_name && strcmp(a.long_name, long_name) == 0 && a.type == ARG_INT) {
+        const ArgumentParser::ArgItem& a = parser.args[i];
+        
+        if (a.long_name && strcmp(a.long_name, long_name) == 0 && a.type == ArgType::kInt) {
             if (index < 0 || index >= a.repeated_count) return nullptr;
             return (const int*)a.repeated_values[index];
         }
@@ -208,7 +212,7 @@ bool Parse(ArgumentParser& parser, int argc, const char* argv[]) {
 
     // Проверка обязательных аргументов
     for (int i = 0; i < parser.arg_count; i++) {
-        auto& a = parser.args[i];
+        ArgumentParser::ArgItem& a = parser.args[i];
         if (a.is_required && !a.is_flag && a.nargs >= NARGS_REQUIRED && !a.storage) {
             fprintf(stderr, "Missing required argument: %s\n", a.long_name);
             return false;
