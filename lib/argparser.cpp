@@ -8,7 +8,7 @@ using namespace nargparse;
 // =============================
 //  Вспомогательные функции
 // =============================
-static void ExpandArgs(ArgumentParser& parser) {
+void ExpandArgs(ArgumentParser& parser) {
     if (parser.arg_count >= parser.arg_capacity) {
         int new_cap = (parser.arg_capacity == 0) ? 8 : parser.arg_capacity * 2;        
         ArgumentParser::ArgItem* new_args = new ArgumentParser::ArgItem[new_cap];
@@ -23,7 +23,7 @@ static void ExpandArgs(ArgumentParser& parser) {
     }
 }
 
-static void ExpandRepeated(ArgumentParser::ArgItem& arg) {
+void ExpandRepeated(ArgumentParser::ArgItem& arg) {
     if (arg.repeated_count >= arg.repeated_capacity) {
         int new_cap = (arg.repeated_capacity == 0) ? 4 : arg.repeated_capacity * 2;
         void** new_args = new void*[new_cap];
@@ -38,7 +38,7 @@ static void ExpandRepeated(ArgumentParser::ArgItem& arg) {
     }
 }
 
-static ArgumentParser::ArgItem* FindArg(ArgumentParser& parser, const char* name) {
+ArgumentParser::ArgItem* FindArg(ArgumentParser& parser, const char* name) {
     for (int i = 0; i < parser.arg_count; i++) {
         ArgumentParser::ArgItem& a = parser.args[i];
         if ((a.long_name && strcmp(a.long_name, name) == 0) ||
@@ -93,11 +93,12 @@ bool AddFlag(ArgumentParser& parser,
              bool* storage,
              const char* description,
              bool default_value=false) {
-    ExpandArgs(parser);
-
     *storage = default_value;
-
+    
+    ExpandArgs(parser);
     ArgumentParser::ArgItem& flag = parser.args[parser.arg_count++];
+    std::memset(&flag, 0, sizeof(flag));
+
     flag.long_name = long_name;
     flag.short_name = short_name;
     flag.description = description;
@@ -111,7 +112,7 @@ bool AddFlag(ArgumentParser& parser,
     return true;
 }
 
-static bool AddArgument(ArgumentParser& parser,
+bool AddArgument(ArgumentParser& parser,
                            const char* short_name,
                            const char* long_name,
                            void* storage,
@@ -142,9 +143,9 @@ static bool AddArgument(ArgumentParser& parser,
 // =============================
 int GetRepeatedCount(const ArgumentParser& parser, const char* long_name) {
     for (int i = 0; i < parser.arg_count; i++) {
-        const ArgumentParser::ArgItem& a = parser.args[i];
-        if (a.long_name && strcmp(a.long_name, long_name) == 0)
-            return a.repeated_count;
+        const ArgumentParser::ArgItem& arg = parser.args[i];
+        if (arg.long_name && strcmp(arg.long_name, long_name) == 0)
+            return arg.repeated_count;
     }
     return 0;
 }
@@ -164,60 +165,16 @@ const int* GetRepeated(const ArgumentParser& parser, const char* long_name, int 
 // =============================
 //  Парсинг аргументов
 // =============================
-bool Parse(ArgumentParser& parser, int argc, const char* argv[]) {
+bool Parse(ArgumentParser& parser, int argc, const char** argv) {
+    char prev_char = '\0';
     for (int i = 1; i < argc; i++) {
-        const char* token = argv[i];
-
-        // --- Флаг или именованный аргумент ---
-        if (token[0] == '-') {
-            const char* name = (token[1] == '-') ? token : token;
-            ArgumentParser::ArgItem* arg = FindArg(parser, name);
-            if (!arg) {
-                fprintf(stderr, "Unknown option: %s\n", token);
-                return false;
-            }
-
-            if (arg->type == ARG_FLAG) {
-                if (arg->storage) *((bool*)arg->storage) = true;
-                continue;
-            }
-
-            // --- Аргумент с числовым значением ---
-            if (i + 1 >= argc) {
-                fprintf(stderr, "Missing value for %s\n", token);
-                return false;
-            }
-            const char* val_str = argv[i++];
-            int val = atoi(val_str);
-
-            if (arg->validator && !arg->validator(&val)) {
-                fprintf(stderr, "Invalid value for %s: %s\n", token, val_str);
-                return false;
-            }
-
-            if (arg->nargs == NARGS_REQUIRED || arg->nargs == NARGS_OPTIONAL) {
-                if (arg->storage) *((int*)arg->storage) = val;
-            } else { // Повторяющийся
-                ExpandRepeated(*arg);
-                int* stored = (int*)malloc(sizeof(int));
-                *stored = val;
-                arg->repeated_values[arg->repeated_count++] = stored;
-            }
-            continue;
+        char cur_char = argv[i][0];
+        if (cur_char == '-' && prev_char == '-') {
+            
         }
-
-        // --- Позиционный аргумент ---
-        // Можно добавить аналогично, если требуется
+    
+        prev_char = cur_char;
     }
-
-    // Проверка обязательных аргументов
-    for (int i = 0; i < parser.arg_count; i++) {
-        ArgumentParser::ArgItem& a = parser.args[i];
-        if (a.is_required && !a.is_flag && a.nargs >= NARGS_REQUIRED && !a.storage) {
-            fprintf(stderr, "Missing required argument: %s\n", a.long_name);
-            return false;
-        }
-    }
-
+    
     return true;
 }

@@ -126,7 +126,7 @@ bool AddArgument(ArgumentParser& parser,
                  const char* error_msg = nullptr);
 
 
-bool Parse(ArgumentParser& parser, int argc, const char* argv[]);
+bool Parse(ArgumentParser& parser, int argc, const char** argv);
 
 int GetRepeatedCount(const ArgumentParser& parser, const char* long_name);
 const int* GetRepeated(const ArgumentParser& parser, const char* long_name, int index);
