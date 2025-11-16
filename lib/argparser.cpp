@@ -1,4 +1,5 @@
 #include "argparser.h"
+#include <iostream>
 #include <cstdlib>
 #include <cstring>
 #include <cctype>
@@ -6,18 +7,10 @@
 
 namespace nargparse {
 
-// =============================
-//   Forward declarations
-// =============================
 bool SetArgumentValue(ArgumentParser::ArgItem& arg, const char* value, size_t max_arg_len);
 bool StringToInt(const char* str, int* out);
 bool StringToFloat(const char* str, float* out);
 
-// =============================
-//   Создание и уничтожение парсера
-// =============================
-
-// Создает новый парсер с пустым списком аргументов
 ArgumentParser CreateParser(const char* program_name, size_t max_arg_len) {
     ArgumentParser parser;
     parser.program_name = program_name;
@@ -29,14 +22,10 @@ ArgumentParser CreateParser(const char* program_name, size_t max_arg_len) {
     return parser;
 }
 
-// Освобождает всю память, связанную с парсером
-// Очищает all arguments, their values, and metadata
 void FreeParser(ArgumentParser& parser) {
     for (int i = 0; i < parser.arg_count; i++) {
-        // Освобождаем повторяющиеся значения аргумента
         if (parser.args[i].repeated_values != nullptr) {
             for (int j = 0; j < parser.args[i].repeated_count; j++) {
-                // Тип очистки зависит от типа аргумента
                 if (parser.args[i].type == ArgType::kString) {
                     delete[] (char*)parser.args[i].repeated_values[j];
                 } else if (parser.args[i].type == ArgType::kInt) {
@@ -48,26 +37,17 @@ void FreeParser(ArgumentParser& parser) {
             delete[] parser.args[i].repeated_values;
         }
     }
-    // Финальная очистка главного массива аргументов
     delete[] parser.args;
     parser.args = nullptr;
     parser.arg_count = 0;
     parser.arg_capacity = 0;
 }
 
-// =============================
-//   Динамическое расширение массивов
-// =============================
-
-// Расширяет массив аргументов, если достигнута максимальная емкость
-// Использует стратегию удвоения размера (начиная с 10 элементов)
 void ExpandArgs(ArgumentParser& parser) {
     if (parser.arg_count >= parser.arg_capacity) {
-        // Если это первое выделение, начни с 10 элементов; иначе удвой размер
         int new_capacity = (parser.arg_capacity == 0) ? 10 : parser.arg_capacity * 2;
         ArgumentParser::ArgItem* new_args = new ArgumentParser::ArgItem[new_capacity];
         
-        // Копируем старые элементы в новый массив (если они есть)
         if (parser.args != nullptr) {
             for (int i = 0; i < parser.arg_count; i++) {
                 new_args[i] = parser.args[i];
@@ -80,14 +60,12 @@ void ExpandArgs(ArgumentParser& parser) {
     }
 }
 
-// Расширяет массив повторяющихся значений для конкретного аргумента
-// Используется когда аргумент может быть повторен (kZeroOrMore, kOneOrMore)
 void ExpandRepeated(ArgumentParser::ArgItem& arg) {
     if (arg.repeated_count >= arg.repeated_capacity) {
         int new_capacity = (arg.repeated_capacity == 0) ? 8 : arg.repeated_capacity * 2;
         void** new_values = new void*[new_capacity];
         
-        // Копируем старые значения в новый массив
+
         if (arg.repeated_values != nullptr) {
             std::memcpy(new_values, arg.repeated_values, arg.repeated_count);
             delete[] arg.repeated_values;
@@ -98,9 +76,6 @@ void ExpandRepeated(ArgumentParser::ArgItem& arg) {
     }
 }
 
-// =============================
-//   Поиск аргумента
-// =============================
 ArgumentParser::ArgItem* FindArg(ArgumentParser& parser, const char* short_name, const char* long_name) {
     for (int i = 0; i < parser.arg_count; i++) {
         if (long_name != nullptr && parser.args[i].long_name != nullptr && 
@@ -115,30 +90,23 @@ ArgumentParser::ArgItem* FindArg(ArgumentParser& parser, const char* short_name,
     return nullptr;
 }
 
-// =============================
-//   Преобразование типов (string -> типизированные значения)
-// =============================
-
 bool StringToInt(const char* str, int* out) {
     if (str == nullptr || str[0] == '\0') return false;
     
     char* end;
     long val = std::strtol(str, &end, 10);
     
-    // Проверяем, была ли вся строка успешно преобразована
     if (*end != '\0') return false;
     *out = (int)val;
     return true;
 }
 
-// Преобразует строку в число с плавающей точкой
 bool StringToFloat(const char* str, float* out) {
     if (str == nullptr || str[0] == '\0') return false;
     
     char* end;
     float val = std::strtof(str, &end);
     
-    // Проверяем, была ли вся строка успешно преобразована
     if (*end != '\0') return false;
     *out = val;
     return true;
@@ -279,10 +247,6 @@ bool AddArgument(ArgumentParser& parser,
                       (void*)validator, error_msg);
 }
 
-// =============================
-//   AddHelp
-// =============================
-
 bool AddHelp(ArgumentParser& parser,
              const char* long_name,
              const char* short_name,
@@ -292,67 +256,42 @@ bool AddHelp(ArgumentParser& parser,
     return AddFlag(parser, short_name, long_name, &flag, description, false);
 }
 
-// =============================
-//   Вспомогательные функции парсинга
-// =============================
-
-// Устанавливает значение для аргумента
-// Обрабатывает все типы (int, float, string), валидацию и повторения
-// Возвращает true если успешно, false если конвертация или валидация не удалась
 bool SetArgumentValue(ArgumentParser::ArgItem& arg, const char* value, size_t max_arg_len) {
-    // ===== ОБРАБОТКА ЦЕЛЫХ ЧИСЕЛ =====
     if (arg.type == ArgType::kInt) {
         int val = 0;
-        // Шаг 1: Преобразуем строку в число
-        if (!StringToInt(value, &val)) {
-            return false;  // Ошибка парсинга
-        }
+        if (!StringToInt(value, &val)) return false;
         
-        // Шаг 2: Валидируем значение (если задан validator)
         if (arg.validator != nullptr) {
             bool (*typed_validator)(const int&) = (bool(*)(const int&))arg.validator;
-            if (!typed_validator(val)) {
-                return false;  // Валидация провалилась
-            }
+            if (!typed_validator(val)) return false;
         }
         
-        // Шаг 3: Сохраняем значение в основное хранилище (для первого значения)
         if (arg.repeated_count == 0 && arg.storage != nullptr) {
             *(int*)arg.storage = val;
         }
         
-        // Шаг 4: Если это повторяющийся аргумент, добавляем в массив
         if (arg.nargs == ArgNargs::kZeroOrMore || arg.nargs == ArgNargs::kOneOrMore) {
             ExpandRepeated(arg);
             int* p = new int(val);
             arg.repeated_values[arg.repeated_count++] = p;
         }
         
-        arg.was_set = true;  // Отмечаем, что аргумент был установлен
+        arg.was_set = true;
         return true;
-        
-    // ===== ОБРАБОТКА ЧИСЕЛ С ПЛАВАЮЩЕЙ ТОЧКОЙ =====
+
     } else if (arg.type == ArgType::kFloat) {
         float val = 0.0f;
-        // Шаг 1: Преобразуем строку в число
-        if (!StringToFloat(value, &val)) {
-            return false;
-        }
+        if (!StringToFloat(value, &val)) return false;
         
-        // Шаг 2: Валидируем значение
         if (arg.validator != nullptr) {
-            bool (*typed_validator)(const float&) = (bool(*)(const float&))arg.validator;
-            if (!typed_validator(val)) {
-                return false;
-            }
+            bool (*type_validator)(const float&) = (bool(*)(const float&))arg.validator;
+            if (!type_validator(val)) return false;
         }
         
-        // Шаг 3: Сохраняем в основное хранилище
         if (arg.repeated_count == 0 && arg.storage != nullptr) {
             *(float*)arg.storage = val;
         }
-        
-        // Шаг 4: Добавляем в массив если это повторяющийся аргумент
+
         if (arg.nargs == ArgNargs::kZeroOrMore || arg.nargs == ArgNargs::kOneOrMore) {
             ExpandRepeated(arg);
             float* p = new float(val);
@@ -360,15 +299,14 @@ bool SetArgumentValue(ArgumentParser::ArgItem& arg, const char* value, size_t ma
         }
         
         arg.was_set = true;
+        return true;
+        
     } else if (arg.type == ArgType::kString) {
-        if (std::strlen(value) >= max_arg_len) {
-            return false;
-        }
+        if (std::strlen(value) >= max_arg_len) return false;
+
         if (arg.validator != nullptr) {
             bool (*typed_validator)(const char* const&) = (bool(*)(const char* const&))arg.validator;
-            if (!typed_validator(value)) {
-                return false;
-            }
+            if (!typed_validator(value)) return false;
         }
         
         if (arg.repeated_count == 0 && arg.storage != nullptr) {
@@ -387,8 +325,6 @@ bool SetArgumentValue(ArgumentParser::ArgItem& arg, const char* value, size_t ma
     return true;
 }
 
-// Обработать позиционный аргумент
-// positional_index - индекс следующего позиционного аргумента для обработки
 bool ParsePositional(ArgumentParser& parser, int& positional_index, const char* arg) {
     ArgumentParser::ArgItem* item = nullptr;
     
@@ -402,7 +338,6 @@ bool ParsePositional(ArgumentParser& parser, int& positional_index, const char* 
     
     if (item == nullptr) return false;
     
-    // Если это первое значение и аргумент не повторяющийся, то перейти к следующему позиционному
     if (item->repeated_count == 0 && item->nargs != ArgNargs::kZeroOrMore && item->nargs != ArgNargs::kOneOrMore) {
         positional_index++;
     }
@@ -410,19 +345,12 @@ bool ParsePositional(ArgumentParser& parser, int& positional_index, const char* 
     return SetArgumentValue(*item, arg, parser.max_arg_len);
 }
 
-// =============================
-//   Получение повторяющихся значений
-// =============================
-
-// Возвращает количество значений для повторяющегося аргумента
-// Ищет аргумент по description или long_name
 int GetRepeatedCount(const ArgumentParser& parser, const char* long_name) {
     for (int i = 0; i < parser.arg_count; i++) {
-        // Сначала пробуем найти по description (работает для всех аргументов)
         if (parser.args[i].description != nullptr && std::strcmp(parser.args[i].description, long_name) == 0) {
             return parser.args[i].repeated_count;
         }
-        // Затем по long_name (для именованных аргументов)
+
         if (parser.args[i].long_name != nullptr && std::strcmp(parser.args[i].long_name, long_name) == 0) {
             return parser.args[i].repeated_count;
         }
@@ -430,12 +358,8 @@ int GetRepeatedCount(const ArgumentParser& parser, const char* long_name) {
     return 0;
 }
 
-// Возвращает значение на определенной позиции для повторяющегося аргумента
-// out - указатель куда записать результат (тип зависит от arg type)
-// Возвращает true если успешно получено, false если индекс неверный
 bool GetRepeated(const ArgumentParser& parser, const char* long_name, int index, void* out) {
     for (int i = 0; i < parser.arg_count; i++) {
-        // Ищем аргумент по description или long_name
         bool found = false;
         if (parser.args[i].description != nullptr && std::strcmp(parser.args[i].description, long_name) == 0) {
             found = true;
@@ -444,15 +368,12 @@ bool GetRepeated(const ArgumentParser& parser, const char* long_name, int index,
         }
         
         if (found) {
-            // Проверяем, что индекс в допустимых пределах
             if (index < 0 || index >= parser.args[i].repeated_count) {
                 return false;
             }
             
-            // Извлекаем значение из массива
             void* value = parser.args[i].repeated_values[index];
             
-            // Копируем значение в правильном формате в зависимости от типа
             if (parser.args[i].type == ArgType::kInt) {
                 *(int*)out = *(int*)value;
             } else if (parser.args[i].type == ArgType::kFloat) {
