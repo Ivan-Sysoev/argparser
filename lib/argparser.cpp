@@ -8,6 +8,10 @@
 namespace nargparse {
 
 bool SetArgumentValue(ArgumentParser::ArgItem& arg, const char* value, size_t max_arg_len);
+bool SetArgumentValueInt(ArgumentParser::ArgItem& arg, const char* value, size_t max_arg_len);
+bool SetArgumentValueFloat(ArgumentParser::ArgItem& arg, const char* value, size_t max_arg_len);
+bool SetArgumentValueString(ArgumentParser::ArgItem& arg, const char* value, size_t max_arg_len);
+
 bool StringToInt(const char* str, int* out);
 bool StringToFloat(const char* str, float* out);
 
@@ -404,7 +408,6 @@ bool CheckPositional(ArgumentParser& parser) {
             return false;
         }
     }
-
     return true;
 }
 
@@ -438,19 +441,11 @@ bool Parse(ArgumentParser& parser, int argc, const char** argv) {
         const char* token = argv[i];
         
         if (!IsToken(token)) {
-            // Это позиционный аргумент
             if (!ParsePositional(parser, positional_index, token)) return false;
-            
         } else {
-            // Это флаг или именованный аргумент
             char name[256];
             const char* value = nullptr;
             GetFlag(token, name, &value);
-            
-            if (parser.help_added && 
-                (std::strcmp(name, "--help") == 0 || std::strcmp(name, "-h") == 0)) {
-                return true;
-            }
             
             ArgumentParser::ArgItem* item = FindArg(parser, name, name);
             if (item == nullptr) return false;
@@ -460,7 +455,6 @@ bool Parse(ArgumentParser& parser, int argc, const char** argv) {
                     *(bool*)item->storage = true;
                 }
                 item->was_set = true;
-
             } else {
                 if (value == nullptr) {
                     if (i + 1 < argc) {
@@ -469,20 +463,14 @@ bool Parse(ArgumentParser& parser, int argc, const char** argv) {
                         return false;
                     }
                 }
-                
-                if (item->was_set && item->nargs != ArgNargs::kZeroOrMore && item->nargs != ArgNargs::kOneOrMore) {
-                    return false;  // Дублирование аргумента
-                }
-                
-                if (!SetArgumentValue(*item, value, parser.max_arg_len)) {
-                    return false;
-                }
+            
+                if (item->was_set && item->nargs != ArgNargs::kZeroOrMore && item->nargs != ArgNargs::kOneOrMore) return false;
+                if (!SetArgumentValue(*item, value, parser.max_arg_len)) return false;
             }
         }
     }
     
     if (!CheckPositional(parser)) return false;
-    
     return true;
 }
 
