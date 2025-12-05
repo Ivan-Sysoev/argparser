@@ -256,71 +256,81 @@ bool AddHelp(ArgumentParser& parser,
     return AddFlag(parser, short_name, long_name, &flag, description, false);
 }
 
+bool SetArgumentValueInt(ArgumentParser::ArgItem& arg, const char* value, size_t max_arg_len) {
+    int val = 0;
+    if (!StringToInt(value, &val)) return false;
+
+    if (arg.validator != nullptr) {
+        bool (*typed_validator)(const int&) = (bool(*)(const int&))arg.validator;
+        if (!typed_validator(val)) return false;
+    }
+
+    if (arg.repeated_count == 0 && arg.storage != nullptr) {
+        *(int*)arg.storage = val;
+    }
+    
+    if (arg.nargs == ArgNargs::kOneOrMore || arg.nargs == ArgNargs::kZeroOrMore) {
+        int* p = new int(val);
+        ExpandRepeated(arg);
+        arg.repeated_values[arg.repeated_count++] = p;
+    }
+    
+    arg.was_set = true;
+    return true;    
+}
+
+bool SetArgumentValueFloat(ArgumentParser::ArgItem& arg, const char* value, size_t max_arg_len) {
+    float val = 0.0f;
+    if (!StringToFloat(value, &val)) return false;
+
+    if (arg.validator != nullptr) {
+        bool (*typed_validator)(const float&) = (bool(*)(const float&))arg.validator;
+        if (!typed_validator(val)) return false;
+    }
+
+    if (arg.repeated_count == 0 && arg.storage != nullptr) {
+        *(float*)arg.storage = val;
+    }
+    
+    if (arg.nargs == ArgNargs::kOneOrMore || arg.nargs == ArgNargs::kZeroOrMore) {
+        float* p = new float(val);
+        ExpandRepeated(arg);
+        arg.repeated_values[arg.repeated_count++] = p;
+    }
+    
+    arg.was_set = true;
+    return true;    
+}
+
+bool SetArgumentValueString(ArgumentParser::ArgItem& arg, const char* value, size_t max_arg_len) {
+    if (std::strlen(value) >= max_arg_len) return false;
+    
+    if (arg.validator != nullptr) {
+        bool (*typed_validator)(const char* const&) = (bool(*)(const char* const&))arg.validator;
+        if (!typed_validator(value)) return false;
+    }
+
+    if (arg.repeated_count == 0 && arg.storage != nullptr) {
+        std::strcpy((char*)arg.storage, value);
+    }
+    
+    if (arg.nargs == ArgNargs::kOneOrMore || arg.nargs == ArgNargs::kZeroOrMore) {
+        ExpandRepeated(arg);
+        char* p = new char[max_arg_len];
+        std::strcpy(p, value);
+        arg.repeated_values[arg.repeated_count++] = p;
+    }
+    
+    arg.was_set = true;
+    return true;    
+}
+
 bool SetArgumentValue(ArgumentParser::ArgItem& arg, const char* value, size_t max_arg_len) {
-    if (arg.type == ArgType::kInt) {
-        int val = 0;
-        if (!StringToInt(value, &val)) return false;
-        
-        if (arg.validator != nullptr) {
-            bool (*typed_validator)(const int&) = (bool(*)(const int&))arg.validator;
-            if (!typed_validator(val)) return false;
-        }
-        
-        if (arg.repeated_count == 0 && arg.storage != nullptr) {
-            *(int*)arg.storage = val;
-        }
-        
-        if (arg.nargs == ArgNargs::kZeroOrMore || arg.nargs == ArgNargs::kOneOrMore) {
-            ExpandRepeated(arg);
-            int* p = new int(val);
-            arg.repeated_values[arg.repeated_count++] = p;
-        }
-        
-        arg.was_set = true;
-        return true;
-
-    } else if (arg.type == ArgType::kFloat) {
-        float val = 0.0f;
-        if (!StringToFloat(value, &val)) return false;
-        
-        if (arg.validator != nullptr) {
-            bool (*type_validator)(const float&) = (bool(*)(const float&))arg.validator;
-            if (!type_validator(val)) return false;
-        }
-        
-        if (arg.repeated_count == 0 && arg.storage != nullptr) {
-            *(float*)arg.storage = val;
-        }
-
-        if (arg.nargs == ArgNargs::kZeroOrMore || arg.nargs == ArgNargs::kOneOrMore) {
-            ExpandRepeated(arg);
-            float* p = new float(val);
-            arg.repeated_values[arg.repeated_count++] = p;
-        }
-        
-        arg.was_set = true;
-        return true;
-        
-    } else if (arg.type == ArgType::kString) {
-        if (std::strlen(value) >= max_arg_len) return false;
-
-        if (arg.validator != nullptr) {
-            bool (*typed_validator)(const char* const&) = (bool(*)(const char* const&))arg.validator;
-            if (!typed_validator(value)) return false;
-        }
-        
-        if (arg.repeated_count == 0 && arg.storage != nullptr) {
-            std::strcpy((char*)arg.storage, value);
-        }
-        
-        if (arg.nargs == ArgNargs::kZeroOrMore || arg.nargs == ArgNargs::kOneOrMore) {
-            ExpandRepeated(arg);
-            char* p = new char[max_arg_len];
-            std::strcpy(p, value);
-            arg.repeated_values[arg.repeated_count++] = p;
-        }
-        
-        arg.was_set = true;
+    switch (arg.type) {
+        case ArgType::kInt: return SetArgumentValueInt(arg, value, max_arg_len);
+        case ArgType::kFloat: return SetArgumentValueFloat(arg, value, max_arg_len);
+        case ArgType::kString: return SetArgumentValueString(arg, value, max_arg_len);
+        default: return false;
     }
     return true;
 }
