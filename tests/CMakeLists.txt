@@ -19,7 +19,7 @@ add_executable(
 
 target_link_libraries(
   argparser_tests
-  argparser
+  argparser_lib
   GTest::gtest_main
 )
 

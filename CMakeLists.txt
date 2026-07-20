@@ -1,9 +1,9 @@
 cmake_minimum_required(VERSION 3.12)
 
 project(
-    labwork3
+    argparser
     VERSION 1.0
-    DESCRIPTION "C++ Year 2025 Labwork3"
+    DESCRIPTION "Command-line argument parsing library"
     LANGUAGES CXX
 )
 
