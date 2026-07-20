@@ -1,71 +1,20 @@
-# Лабораторная работа 3
+# argparser
 
-## Задача
+A small library for parsing command-line arguments, written from scratch.
+It supports integers, floats, string arguments (with a fixed max length) and flags,
+both in short (`-n`) and long (`--name`) form, with no length limit on names or descriptions.
 
-Спроектировать и реализовать библиотеку для парсинга аргументов командной строки.
+I built it **test-first**: a GoogleTest suite defines the interface and behaviour the library is
+expected to expose, and the implementation grows until everything passes. The tests are the spec.
 
-## Требования
+I also gave myself a hard constraint: **no containers, no strings, no templates, no classes** in
+the implementation. So the storage is hand-managed with dynamic allocation, and I spent a while
+thinking about how to avoid copy-paste across the different argument types.
 
-В качестве требований Вам дается файл с [тестами](tests/argparser_tests.cpp). Исходя из тестов, Вы должны понять, какой набор функций предоставляет библиотека. Ваша задача добиться, чтобы все тесты "проходили".
-
-Типы, которые нужно поддерживать:
- - целые числа
- - вещественные числа
- - флаги
- - строки (максимальная длина - константа)
-   
-Ограничения на длину имен аргументов и описаний быть не должно.
-
-Вам не запрещается добавлять произвольные типы и расширять функционал.
-
-### Тесты
-
-Как и в предыдущих лабораторных работах, в качестве тестового фреймворка используется [GoogleTest](https://google.github.io/googletest/). Каждый тест представляет из себя функцию, в рамках которой проверяются некоторые условия за счет [assert'ов](https://google.github.io/googletest/reference/assertions.html).
-
-Тесты не покрывают всю функциональность. Рекомендуется дополнить их собственными проверками.
-
-## Реализация
-
-Реализация должна находиться в библиотеке [argparser](lib/CMakeLists.txt).
-
-Лабораторная работа подразумевает работу с динамическим аллоцированием памяти. Подумайте, как её тут можно использовать.
-
-Подумайте как избежать лишней копипасты кода.
-
-## Ограничения
-
-В реализации запрещено использовать:
- - Контейнеры и строки
- - Шаблоны
- - Классы
-
-### Примеры запуска
-
-Пример программы с использованием парсера находится в [bin](bin/main.cpp). Программа умеет складывать или умножать переданные ей аргументы.
-
-*labwork3 --sum 2 4 6*
-
-*labwork3 --mult 2 4 6*
-
-## ТеорМин
-
-1. Виртуальное адресное пространство    
-2. Сегменты памяти
-3. Стэк вызова
-4. Куча
-5. Перегрузки функций
-6. Ссылки
-7. Namespace
-8. Препроцессор
-
-
-## Deadline
-
-| deadline | date | coeff | branch |
-|----------|-----------------|-------|------------|
-| 0 | 10.11.25 23:59 | 1.0 | deadline_0 |
-| 1 | 17.11.25 23:59 | 0.8 | deadline_1 |
-| 2 | 24.11.25 23:59 | 0.65 | deadline_2 |
-| 3 | 01.12.25 00:00 | 0.5 | deadline_3 |
-
-Максимальное количество баллов - 12
+**Build & run**
+```sh
+cmake -B build && cmake --build build
+./build/bin/argparser --sum 2 4 6     # example app that adds its arguments
+./build/bin/argparser --mult 2 4 6    # ...or multiplies them
+```
+Library code is in [`lib/`](lib), tests in [`tests/`](tests).
